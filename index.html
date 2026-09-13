@@ -13,6 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --bg:#0A0C22; --bg2:#05060F; --surface:#141A3E; --line:#232E5C;
@@ -197,12 +198,16 @@
 <script>
   document.getElementById('yr').textContent = new Date().getFullYear();
 
-  // Waitlist form. NOTE: wire the fetch() below to your email backend
-  // (Resend, Mailchimp, Supabase, etc.) before launch. Right now it validates
-  // and shows confirmation but does not yet send anywhere.
+  // --- Supabase waitlist ---
+  // The anon key is safe to expose in a public page (that's its purpose).
+  // The waitlist table is INSERT-ONLY via RLS, so no one can read the list with it.
+  var SUPABASE_URL = 'https://mgzgqppnypodcuyiwbkk.supabase.co';
+  var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1nemdxcHBueXBvZGN1eWl3YmtrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxMzExODcsImV4cCI6MjEwMTcwNzE4N30.yoriC1jRrpF0LWzBda5sSBHWFJjw-OKi1kDScTadWIM';
+  var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
   var form = document.getElementById('wl');
   var note = document.getElementById('note');
-  form.addEventListener('submit', function(e){
+  form.addEventListener('submit', async function(e){
     e.preventDefault();
     var email = document.getElementById('email').value.trim();
     var age = document.getElementById('age').checked;
@@ -211,11 +216,22 @@
     if(!valid){ note.textContent = 'Please enter a valid email address.'; note.classList.add('err'); return; }
     if(!age){ note.textContent = 'Please confirm you are 18 or older.'; note.classList.add('err'); return; }
 
-    // --- TODO: replace this block with a real POST to your list backend ---
-    // fetch('/api/waitlist', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email})})
-    note.textContent = "You're on the list. We'll be in touch as we open access.";
-    note.classList.add('ok');
-    form.reset();
+    var btn = form.querySelector('.btn');
+    btn.disabled = true;
+    try {
+      var res = await sb.from('waitlist').insert({ email: email, source: 'landing' });
+      if (res.error && res.error.code !== '23505') { // 23505 = duplicate = already signed up, treat as success
+        throw res.error;
+      }
+      note.textContent = "You're on the list. We'll be in touch as we open access.";
+      note.classList.add('ok');
+      form.reset();
+    } catch (err) {
+      note.textContent = 'Something went wrong — please try again.';
+      note.classList.add('err');
+    } finally {
+      btn.disabled = false;
+    }
   });
 </script>
 </body>
